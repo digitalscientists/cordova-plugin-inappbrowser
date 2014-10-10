@@ -20,3 +20,7 @@
 # org.apache.cordova.inappbrowser
 
 Plugin documentation: [doc/index.md](doc/index.md)
+
+This fork has been modified for custom usage on android.
+
+The InAppBrowser is no longer full screen, and a hide method is exposed.
