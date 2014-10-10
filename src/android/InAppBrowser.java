@@ -206,6 +206,17 @@ public class InAppBrowser extends CordovaPlugin {
             pluginResult.setKeepCallback(true);
             this.callbackContext.sendPluginResult(pluginResult);
         }
+        else if (action.equals("hide")) {
+            this.cordova.getActivity().runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    dialog.hide();
+                }
+            });
+            PluginResult pluginResult = new PluginResult(PluginResult.Status.OK);
+            pluginResult.setKeepCallback(true);
+            this.callbackContext.sendPluginResult(pluginResult);
+        }
         else {
             return false;
         }
@@ -639,14 +650,27 @@ public class InAppBrowser extends CordovaPlugin {
                 // Add our webview to our main view/layout
                 main.addView(inAppWebView);
 
+                dialog.setContentView(main);
+                dialog.show();
+
+                android.view.Display display = dialog.getWindow().getWindowManager().getDefaultDisplay();
+                android.graphics.Point size = new android.graphics.Point();
+                display.getSize(size);
+                
                 WindowManager.LayoutParams lp = new WindowManager.LayoutParams();
                 lp.copyFrom(dialog.getWindow().getAttributes());
                 lp.width = WindowManager.LayoutParams.MATCH_PARENT;
-                lp.height = WindowManager.LayoutParams.MATCH_PARENT;
+                lp.height = (int)(0.7 * size.y);
+                LOG.e(LOG_TAG, " " + lp.height + ": ");
+                lp.y = (int)(0.15 * size.y);
+                lp.gravity = Gravity.TOP;
 
-                dialog.setContentView(main);
-                dialog.show();
                 dialog.getWindow().setAttributes(lp);
+                dialog.getWindow().setFlags(
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL, 
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
+                );
+
                 // the goal of openhidden is to load the url and not display it
                 // Show() needs to be called to cause the URL to be loaded
                 if(openWindowHidden) {
