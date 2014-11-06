@@ -88,6 +88,8 @@ public class InAppBrowser extends CordovaPlugin {
     private String buttonLabel = "Done";
     private boolean clearAllCache= false;
     private boolean clearSessionCache=false;
+    private double height = 0.88;
+    private double top = 0.11;
 
     /**
      * Executes the request and returns PluginResult.
@@ -106,7 +108,7 @@ public class InAppBrowser extends CordovaPlugin {
                 t = SELF;
             }
             final String target = t;
-            final HashMap<String, Boolean> features = parseFeature(args.optString(2));
+            final HashMap<String, String> features = parseFeature(args.optString(2));
             
             Log.d(LOG_TAG, "target = " + target);
             
@@ -287,11 +289,11 @@ public class InAppBrowser extends CordovaPlugin {
      * @param optString
      * @return
      */
-    private HashMap<String, Boolean> parseFeature(String optString) {
+    private HashMap<String, String> parseFeature(String optString) {
         if (optString.equals(NULL)) {
             return null;
         } else {
-            HashMap<String, Boolean> map = new HashMap<String, Boolean>();
+            HashMap<String, String> map = new HashMap<String, String>();
             StringTokenizer features = new StringTokenizer(optString, ",");
             StringTokenizer option;
             while(features.hasMoreElements()) {
@@ -301,7 +303,7 @@ public class InAppBrowser extends CordovaPlugin {
                     if (key.equalsIgnoreCase(CLOSE_BUTTON_CAPTION)) {
                         this.buttonLabel = option.nextToken();
                     } else {
-                        Boolean value = option.nextToken().equals("no") ? Boolean.FALSE : Boolean.TRUE;
+                        String value = option.nextToken();
                         map.put(key, value);
                     }
                 }
@@ -418,6 +420,14 @@ public class InAppBrowser extends CordovaPlugin {
     private boolean getShowLocationBar() {
         return this.showLocationBar;
     }
+    
+    private double getHeight() {
+        return this.height;
+    }
+    
+    private double getTop() {
+        return this.top;
+    }
 
     private InAppBrowser getInAppBrowser(){
         return this;
@@ -429,27 +439,23 @@ public class InAppBrowser extends CordovaPlugin {
      * @param url           The url to load.
      * @param jsonObject
      */
-    public String showWebPage(final String url, HashMap<String, Boolean> features) {
+    public String showWebPage(final String url, HashMap<String, String> features) {
         // Determine if we should hide the location bar.
         showLocationBar = true;
         openWindowHidden = false;
+      
         if (features != null) {
-            Boolean show = features.get(LOCATION);
+            String show = features.get(LOCATION);
             if (show != null) {
-                showLocationBar = show.booleanValue();
+                showLocationBar = show == "no";
             }
-            Boolean hidden = features.get(HIDDEN);
-            if (hidden != null) {
-                openWindowHidden = hidden.booleanValue();
+            String heightString = features.get("height");
+            String topString = features.get("top");
+            if(heightString != null){
+                this.height = Double.parseDouble(heightString);
             }
-            Boolean cache = features.get(CLEAR_ALL_CACHE);
-            if (cache != null) {
-                clearAllCache = cache.booleanValue();
-            } else {
-                cache = features.get(CLEAR_SESSION_CACHE);
-                if (cache != null) {
-                    clearSessionCache = cache.booleanValue();
-                }
+            if(topString != null){
+                this.top = Double.parseDouble(topString);
             }
         }
         
@@ -606,7 +612,7 @@ public class InAppBrowser extends CordovaPlugin {
                 WebSettings settings = inAppWebView.getSettings();
                 settings.setJavaScriptEnabled(true);
                 settings.setJavaScriptCanOpenWindowsAutomatically(true);
-                settings.setBuiltInZoomControls(true);
+                settings.setBuiltInZoomControls(false);
                 settings.setPluginState(android.webkit.WebSettings.PluginState.ON);
 
                 //Toggle whether this is enabled or not!
@@ -660,8 +666,8 @@ public class InAppBrowser extends CordovaPlugin {
                 WindowManager.LayoutParams lp = new WindowManager.LayoutParams();
                 lp.copyFrom(dialog.getWindow().getAttributes());
                 lp.width = WindowManager.LayoutParams.MATCH_PARENT;
-                lp.height = (int)(0.82 * size.y);
-                lp.y = (int)(0.11 * size.y);
+                lp.height = (int)(getHeight() * size.y);
+                lp.y = (int)(getTop() * size.y);
                 lp.gravity = Gravity.TOP;
 
                 dialog.getWindow().setAttributes(lp);
@@ -673,7 +679,7 @@ public class InAppBrowser extends CordovaPlugin {
                 // the goal of openhidden is to load the url and not display it
                 // Show() needs to be called to cause the URL to be loaded
                 if(openWindowHidden) {
-                	dialog.hide();
+                    dialog.hide();
                 }
             }
         };
@@ -838,7 +844,7 @@ public class InAppBrowser extends CordovaPlugin {
             } catch (JSONException ex) {
                 Log.d(LOG_TAG, "Should never happen");
             }
-        	
+            
         }
     }
 }
