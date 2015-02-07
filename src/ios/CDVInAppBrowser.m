@@ -68,13 +68,23 @@
     [self.inAppBrowserViewController close];
 }
 
+- (void)hide:(CDVInvokedUrlCommand*)command
+{
+    if (self.inAppBrowserViewController == nil) {
+        NSLog(@"IAB.hide() called but it was already closed.");
+        return;
+    }
+    // Things are cleaned up in browserExit.
+    [self.inAppBrowserViewController hide];
+}
+
 - (BOOL) isSystemUrl:(NSURL*)url
 {
-	if ([[url host] isEqualToString:@"itunes.apple.com"]) {
-		return YES;
-	}
+    if ([[url host] isEqualToString:@"itunes.apple.com"]) {
+        return YES;
+    }
 
-	return NO;
+    return NO;
 }
 
 - (void)open:(CDVInvokedUrlCommand*)command
@@ -148,13 +158,13 @@
         }
     }
 
-    [self.inAppBrowserViewController showLocationBar:browserOptions.location];
-    [self.inAppBrowserViewController showToolBar:browserOptions.toolbar :browserOptions.toolbarposition];
-    if (browserOptions.closebuttoncaption != nil) {
-        [self.inAppBrowserViewController setCloseButtonTitle:browserOptions.closebuttoncaption];
-    }
+//    [self.inAppBrowserViewController showLocationBar:browserOptions.location];
+//    [self.inAppBrowserViewController showToolBar:browserOptions.toolbar :browserOptions.toolbarposition];
+//    if (browserOptions.closebuttoncaption != nil) {
+//        [self.inAppBrowserViewController setCloseButtonTitle:browserOptions.closebuttoncaption];
+//    }
     // Set Presentation Style
-    UIModalPresentationStyle presentationStyle = UIModalPresentationFullScreen; // default
+    UIModalPresentationStyle presentationStyle = UIModalPresentationCustom; // default
     if (browserOptions.presentationstyle != nil) {
         if ([[browserOptions.presentationstyle lowercaseString] isEqualToString:@"pagesheet"]) {
             presentationStyle = UIModalPresentationPageSheet;
@@ -165,7 +175,9 @@
     self.inAppBrowserViewController.modalPresentationStyle = presentationStyle;
 
     // Set Transition Style
-    UIModalTransitionStyle transitionStyle = UIModalTransitionStyleCoverVertical; // default
+//    UIModalTransitionStyle transitionStyle = UIModalTransitionStyleCoverVertical; // default
+    
+    UIModalTransitionStyle transitionStyle = UIModalTransitionStyleCrossDissolve; // default
     if (browserOptions.transitionstyle != nil) {
         if ([[browserOptions.transitionstyle lowercaseString] isEqualToString:@"fliphorizontal"]) {
             transitionStyle = UIModalTransitionStyleFlipHorizontal;
@@ -210,6 +222,12 @@
         return;
     }
     if (_previousStatusBarStyle != -1) {
+        if([self.inAppBrowserViewController.view.window.subviews count] > 1){
+            CGRect bounds = self.inAppBrowserViewController.view.window.bounds;
+            bounds.origin.y = 65;
+            bounds.size.height -= 110;
+            [[[self.inAppBrowserViewController.view.window subviews] objectAtIndex:1] setFrame:bounds];
+        }
         NSLog(@"Tried to show IAB while already shown");
         return;
     }
@@ -218,12 +236,25 @@
 
     CDVInAppBrowserNavigationController* nav = [[CDVInAppBrowserNavigationController alloc]
                                    initWithRootViewController:self.inAppBrowserViewController];
+    
+    
     nav.orientationDelegate = self.inAppBrowserViewController;
     nav.navigationBarHidden = YES;
+    nav.modalPresentationStyle = UIModalPresentationCustom;
+    
+    self.viewController.modalPresentationStyle = UIModalPresentationCustom;
+    
     // Run later to avoid the "took a long time" log message.
     dispatch_async(dispatch_get_main_queue(), ^{
         if (self.inAppBrowserViewController != nil) {
+
+            nav.view.backgroundColor = [UIColor clearColor];
+            nav.view.opaque = NO;
+            nav.view.clipsToBounds = YES;
+            nav.view.userInteractionEnabled = YES;
+            
             [self.viewController presentViewController:nav animated:YES completion:nil];
+
         }
     });
 }
@@ -261,7 +292,7 @@
     if (!_injectedIframeBridge) {
         _injectedIframeBridge = YES;
         // Create an iframe bridge in the new document to communicate with the CDVInAppBrowserViewController
-        [self.inAppBrowserViewController.webView stringByEvaluatingJavaScriptFromString:@"(function(d){var e = _cdvIframeBridge = d.createElement('iframe');e.style.display='none';d.body.appendChild(e);})(document)"];
+        [self.inAppBrowserViewController.webView stringByEvaluatingJavaScriptFromString:@"(function(d){if(!window._cdvIframeBridge){var e = _cdvIframeBridge = d.createElement('iframe');e.style.display='none';d.body.appendChild(e);}})(document)"];
     }
 
     if (jsWrapper != nil) {
@@ -399,6 +430,12 @@
 - (void)webViewDidStartLoad:(UIWebView*)theWebView
 {
     _injectedIframeBridge = NO;
+    
+    CGRect bounds = self.inAppBrowserViewController.view.window.bounds;
+    bounds.origin.y = 65;
+    bounds.size.height -= 110;
+
+    [[[self.viewController.view.window subviews] objectAtIndex:1] setFrame:bounds];
 }
 
 - (void)webViewDidFinishLoad:(UIWebView*)theWebView
@@ -412,6 +449,8 @@
 
         [self.commandDelegate sendPluginResult:pluginResult callbackId:self.callbackId];
     }
+    
+
 }
 
 - (void)webView:(UIWebView*)theWebView didFailLoadWithError:(NSError*)error
@@ -474,117 +513,123 @@
     // We create the views in code for primarily for ease of upgrades and not requiring an external .xib to be included
 
     CGRect webViewBounds = self.view.bounds;
-    BOOL toolbarIsAtBottom = ![_browserOptions.toolbarposition isEqualToString:kInAppBrowserToolbarBarPositionTop];
-    webViewBounds.size.height -= _browserOptions.location ? FOOTER_HEIGHT : TOOLBAR_HEIGHT;
+    self.view.backgroundColor = [UIColor clearColor];
+    
+//    BOOL toolbarIsAtBottom = ![_browserOptions.toolbarposition isEqualToString:kInAppBrowserToolbarBarPositionTop];
+//    webViewBounds.size.height = 475;
+//    webViewBounds.origin.y = 45;
     self.webView = [[UIWebView alloc] initWithFrame:webViewBounds];
 
-    self.webView.autoresizingMask = (UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight);
+    //self.webView.autoresizingMask = (UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight);
 
     [self.view addSubview:self.webView];
     [self.view sendSubviewToBack:self.webView];
 
     self.webView.delegate = _webViewDelegate;
-    self.webView.backgroundColor = [UIColor whiteColor];
+    self.webView.backgroundColor = [UIColor clearColor];
 
     self.webView.clearsContextBeforeDrawing = YES;
     self.webView.clipsToBounds = YES;
     self.webView.contentMode = UIViewContentModeScaleToFill;
     self.webView.multipleTouchEnabled = YES;
-    self.webView.opaque = YES;
+    self.webView.opaque = NO;
     self.webView.scalesPageToFit = NO;
     self.webView.userInteractionEnabled = YES;
+    
+    self.webView.autoresizesSubviews = YES;
 
-    self.spinner = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleWhite];
-    self.spinner.alpha = 1.000;
-    self.spinner.autoresizesSubviews = YES;
-    self.spinner.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleTopMargin;
-    self.spinner.clearsContextBeforeDrawing = NO;
-    self.spinner.clipsToBounds = NO;
-    self.spinner.contentMode = UIViewContentModeScaleToFill;
-    self.spinner.frame = CGRectMake(454.0, 231.0, 20.0, 20.0);
-    self.spinner.hidden = YES;
-    self.spinner.hidesWhenStopped = YES;
-    self.spinner.multipleTouchEnabled = NO;
-    self.spinner.opaque = NO;
-    self.spinner.userInteractionEnabled = NO;
-    [self.spinner stopAnimating];
+//    self.spinner = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleWhite];
+//    self.spinner.alpha = 1.000;
+//    self.spinner.autoresizesSubviews = YES;
+//    self.spinner.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleTopMargin;
+//    self.spinner.clearsContextBeforeDrawing = NO;
+//    self.spinner.clipsToBounds = NO;
+//    self.spinner.contentMode = UIViewContentModeScaleToFill;
+//    self.spinner.frame = CGRectMake(454.0, 231.0, 20.0, 20.0);
+//    self.spinner.hidden = YES;
+//    self.spinner.hidesWhenStopped = YES;
+//    self.spinner.multipleTouchEnabled = NO;
+//    self.spinner.opaque = NO;
+//    self.spinner.userInteractionEnabled = NO;
+//    [self.spinner stopAnimating];
 
-    self.closeButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemDone target:self action:@selector(close)];
-    self.closeButton.enabled = YES;
+//    self.closeButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemDone target:self action:@selector(close)];
+//    self.closeButton.enabled = YES;
 
-    UIBarButtonItem* flexibleSpaceButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil];
+//    UIBarButtonItem* flexibleSpaceButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil];
+//
+//    UIBarButtonItem* fixedSpaceButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFixedSpace target:nil action:nil];
+//    fixedSpaceButton.width = 20;
 
-    UIBarButtonItem* fixedSpaceButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFixedSpace target:nil action:nil];
-    fixedSpaceButton.width = 20;
+//    float toolbarY = toolbarIsAtBottom ? self.view.bounds.size.height - TOOLBAR_HEIGHT : 0.0;
+//    CGRect toolbarFrame = CGRectMake(0.0, toolbarY, self.view.bounds.size.width, TOOLBAR_HEIGHT);
+//
+//    self.toolbar = [[UIToolbar alloc] initWithFrame:toolbarFrame];
+//    self.toolbar.alpha = 1.000;
+//    self.toolbar.autoresizesSubviews = YES;
+//    self.toolbar.autoresizingMask = toolbarIsAtBottom ? (UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleTopMargin) : UIViewAutoresizingFlexibleWidth;
+//    self.toolbar.barStyle = UIBarStyleBlackOpaque;
+//    self.toolbar.clearsContextBeforeDrawing = NO;
+//    self.toolbar.clipsToBounds = NO;
+//    self.toolbar.contentMode = UIViewContentModeScaleToFill;
+//    self.toolbar.hidden = NO;
+//    self.toolbar.multipleTouchEnabled = NO;
+//    self.toolbar.opaque = NO;
+//    self.toolbar.userInteractionEnabled = YES;
 
-    float toolbarY = toolbarIsAtBottom ? self.view.bounds.size.height - TOOLBAR_HEIGHT : 0.0;
-    CGRect toolbarFrame = CGRectMake(0.0, toolbarY, self.view.bounds.size.width, TOOLBAR_HEIGHT);
+//    CGFloat labelInset = 5.0;
+//    float locationBarY = toolbarIsAtBottom ? self.view.bounds.size.height - FOOTER_HEIGHT : self.view.bounds.size.height - LOCATIONBAR_HEIGHT;
+//
+//    self.addressLabel = [[UILabel alloc] initWithFrame:CGRectMake(labelInset, locationBarY, self.view.bounds.size.width - labelInset, LOCATIONBAR_HEIGHT)];
+//    self.addressLabel.adjustsFontSizeToFitWidth = NO;
+//    self.addressLabel.alpha = 1.000;
+//    self.addressLabel.autoresizesSubviews = YES;
+//    self.addressLabel.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleRightMargin | UIViewAutoresizingFlexibleTopMargin;
+//    self.addressLabel.backgroundColor = [UIColor clearColor];
+//    self.addressLabel.baselineAdjustment = UIBaselineAdjustmentAlignCenters;
+//    self.addressLabel.clearsContextBeforeDrawing = YES;
+//    self.addressLabel.clipsToBounds = YES;
+//    self.addressLabel.contentMode = UIViewContentModeScaleToFill;
+//    self.addressLabel.enabled = YES;
+//    self.addressLabel.hidden = NO;
+//    self.addressLabel.lineBreakMode = NSLineBreakByTruncatingTail;
+//
+//    if ([self.addressLabel respondsToSelector:NSSelectorFromString(@"setMinimumScaleFactor:")]) {
+//        [self.addressLabel setValue:@(10.0/[UIFont labelFontSize]) forKey:@"minimumScaleFactor"];
+//    } else if ([self.addressLabel respondsToSelector:NSSelectorFromString(@"setMinimumFontSize:")]) {
+//        [self.addressLabel setValue:@(10.0) forKey:@"minimumFontSize"];
+//    }
+//
+//    self.addressLabel.multipleTouchEnabled = NO;
+//    self.addressLabel.numberOfLines = 1;
+//    self.addressLabel.opaque = NO;
+//    self.addressLabel.shadowOffset = CGSizeMake(0.0, -1.0);
+//    self.addressLabel.text = NSLocalizedString(@"Loading...", nil);
+//    self.addressLabel.textAlignment = NSTextAlignmentLeft;
+//    self.addressLabel.textColor = [UIColor colorWithWhite:1.000 alpha:1.000];
+//    self.addressLabel.userInteractionEnabled = NO;
 
-    self.toolbar = [[UIToolbar alloc] initWithFrame:toolbarFrame];
-    self.toolbar.alpha = 1.000;
-    self.toolbar.autoresizesSubviews = YES;
-    self.toolbar.autoresizingMask = toolbarIsAtBottom ? (UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleTopMargin) : UIViewAutoresizingFlexibleWidth;
-    self.toolbar.barStyle = UIBarStyleBlackOpaque;
-    self.toolbar.clearsContextBeforeDrawing = NO;
-    self.toolbar.clipsToBounds = NO;
-    self.toolbar.contentMode = UIViewContentModeScaleToFill;
-    self.toolbar.hidden = NO;
-    self.toolbar.multipleTouchEnabled = NO;
-    self.toolbar.opaque = NO;
-    self.toolbar.userInteractionEnabled = YES;
+//    NSString* frontArrowString = NSLocalizedString(@"►", nil); // create arrow from Unicode char
+//    self.forwardButton = [[UIBarButtonItem alloc] initWithTitle:frontArrowString style:UIBarButtonItemStylePlain target:self action:@selector(goForward:)];
+//    self.forwardButton.enabled = YES;
+//    self.forwardButton.imageInsets = UIEdgeInsetsZero;
+//
+//    NSString* backArrowString = NSLocalizedString(@"◄", nil); // create arrow from Unicode char
+//    self.backButton = [[UIBarButtonItem alloc] initWithTitle:backArrowString style:UIBarButtonItemStylePlain target:self action:@selector(goBack:)];
+//    self.backButton.enabled = YES;
+//    self.backButton.imageInsets = UIEdgeInsetsZero;
+//
+//    [self.toolbar setItems:@[self.closeButton, flexibleSpaceButton, self.backButton, fixedSpaceButton, self.forwardButton]];
 
-    CGFloat labelInset = 5.0;
-    float locationBarY = toolbarIsAtBottom ? self.view.bounds.size.height - FOOTER_HEIGHT : self.view.bounds.size.height - LOCATIONBAR_HEIGHT;
-
-    self.addressLabel = [[UILabel alloc] initWithFrame:CGRectMake(labelInset, locationBarY, self.view.bounds.size.width - labelInset, LOCATIONBAR_HEIGHT)];
-    self.addressLabel.adjustsFontSizeToFitWidth = NO;
-    self.addressLabel.alpha = 1.000;
-    self.addressLabel.autoresizesSubviews = YES;
-    self.addressLabel.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleRightMargin | UIViewAutoresizingFlexibleTopMargin;
-    self.addressLabel.backgroundColor = [UIColor clearColor];
-    self.addressLabel.baselineAdjustment = UIBaselineAdjustmentAlignCenters;
-    self.addressLabel.clearsContextBeforeDrawing = YES;
-    self.addressLabel.clipsToBounds = YES;
-    self.addressLabel.contentMode = UIViewContentModeScaleToFill;
-    self.addressLabel.enabled = YES;
-    self.addressLabel.hidden = NO;
-    self.addressLabel.lineBreakMode = NSLineBreakByTruncatingTail;
-
-    if ([self.addressLabel respondsToSelector:NSSelectorFromString(@"setMinimumScaleFactor:")]) {
-        [self.addressLabel setValue:@(10.0/[UIFont labelFontSize]) forKey:@"minimumScaleFactor"];
-    } else if ([self.addressLabel respondsToSelector:NSSelectorFromString(@"setMinimumFontSize:")]) {
-        [self.addressLabel setValue:@(10.0) forKey:@"minimumFontSize"];
-    }
-
-    self.addressLabel.multipleTouchEnabled = NO;
-    self.addressLabel.numberOfLines = 1;
-    self.addressLabel.opaque = NO;
-    self.addressLabel.shadowOffset = CGSizeMake(0.0, -1.0);
-    self.addressLabel.text = NSLocalizedString(@"Loading...", nil);
-    self.addressLabel.textAlignment = NSTextAlignmentLeft;
-    self.addressLabel.textColor = [UIColor colorWithWhite:1.000 alpha:1.000];
-    self.addressLabel.userInteractionEnabled = NO;
-
-    NSString* frontArrowString = NSLocalizedString(@"►", nil); // create arrow from Unicode char
-    self.forwardButton = [[UIBarButtonItem alloc] initWithTitle:frontArrowString style:UIBarButtonItemStylePlain target:self action:@selector(goForward:)];
-    self.forwardButton.enabled = YES;
-    self.forwardButton.imageInsets = UIEdgeInsetsZero;
-
-    NSString* backArrowString = NSLocalizedString(@"◄", nil); // create arrow from Unicode char
-    self.backButton = [[UIBarButtonItem alloc] initWithTitle:backArrowString style:UIBarButtonItemStylePlain target:self action:@selector(goBack:)];
-    self.backButton.enabled = YES;
-    self.backButton.imageInsets = UIEdgeInsetsZero;
-
-    [self.toolbar setItems:@[self.closeButton, flexibleSpaceButton, self.backButton, fixedSpaceButton, self.forwardButton]];
-
-    self.view.backgroundColor = [UIColor grayColor];
-    [self.view addSubview:self.toolbar];
-    [self.view addSubview:self.addressLabel];
-    [self.view addSubview:self.spinner];
+//    [self.view addSubview:self.toolbar];
+//    [self.view addSubview:self.addressLabel];
+//    [self.view addSubview:self.spinner];
 }
 
 - (void) setWebViewFrame : (CGRect) frame {
     NSLog(@"Setting the WebView's frame to %@", NSStringFromCGRect(frame));
+    frame.origin.y = 50;
+    frame.size.height = 475;
     [self.webView setFrame:frame];
 }
 
@@ -622,6 +667,7 @@
 
             CGRect webViewBounds = self.view.bounds;
             webViewBounds.size.height -= FOOTER_HEIGHT;
+            webViewBounds.size.height = 400;
             [self setWebViewFrame:webViewBounds];
 
             locationbarFrame.origin.y = webViewBounds.size.height;
@@ -630,7 +676,8 @@
             // no toolBar, so put locationBar at the bottom
 
             CGRect webViewBounds = self.view.bounds;
-            webViewBounds.size.height -= LOCATIONBAR_HEIGHT;
+            webViewBounds.size.height -= LOCATIONBAR_HEIGHT + 200;
+            webViewBounds.size.height = 400;
             [self setWebViewFrame:webViewBounds];
 
             locationbarFrame.origin.y = webViewBounds.size.height;
@@ -643,8 +690,8 @@
             // locationBar is on top of toolBar, hide locationBar
 
             // webView take up whole height less toolBar height
-            CGRect webViewBounds = self.view.bounds;
-            webViewBounds.size.height -= TOOLBAR_HEIGHT;
+            CGRect webViewBounds = CGRectMake(0, 100.0, 320, 400.0);
+
             [self setWebViewFrame:webViewBounds];
         } else {
             // no toolBar, expand webView to screen dimensions
@@ -700,8 +747,7 @@
             // put locationBar at the bottom
 
             // webView take up whole height less locationBar height
-            CGRect webViewBounds = self.view.bounds;
-            webViewBounds.size.height -= LOCATIONBAR_HEIGHT;
+            CGRect webViewBounds = CGRectMake(0, 100.0, 320, 400.0);
             [self setWebViewFrame:webViewBounds];
 
             // move locationBar down
@@ -717,6 +763,7 @@
 - (void)viewDidLoad
 {
     [super viewDidLoad];
+  
 }
 
 - (void)viewDidUnload
@@ -739,7 +786,7 @@
     if ((self.navigationDelegate != nil) && [self.navigationDelegate respondsToSelector:@selector(browserExit)]) {
         [self.navigationDelegate browserExit];
     }
-
+    
     // Run later to avoid the "took a long time" log message.
     dispatch_async(dispatch_get_main_queue(), ^{
         if ([self respondsToSelector:@selector(presentingViewController)]) {
@@ -748,6 +795,14 @@
             [[self parentViewController] dismissViewControllerAnimated:YES completion:nil];
         }
     });
+}
+
+- (void)hide
+{
+    CGRect bounds = self.view.window.bounds;
+    bounds.origin.y = 1065;
+    bounds.size.height -= 110;
+    [[[self.view.window subviews] objectAtIndex:1] setFrame:bounds];
 }
 
 - (void)navigateTo:(NSURL*)url
@@ -878,6 +933,7 @@
     if ((self.orientationDelegate != nil) && [self.orientationDelegate respondsToSelector:@selector(shouldAutorotate)]) {
         return [self.orientationDelegate shouldAutorotate];
     }
+    
     return YES;
 }
 
@@ -897,6 +953,17 @@
     }
 
     return YES;
+}
+
+- (void)didRotateFromInterfaceOrientation:(UIInterfaceOrientation)fromInterfaceOrientation
+{
+    NSLog(@"Did finish rotating");
+    
+    CGRect bounds = self.webView.frame;
+    CGFloat height = bounds.size.height;
+    bounds.size.height = bounds.size.width;
+    bounds.size.width = height;
+    [self.webView setFrame:bounds];
 }
 
 @end
@@ -994,7 +1061,6 @@
 
     return YES;
 }
-
 
 @end
 
