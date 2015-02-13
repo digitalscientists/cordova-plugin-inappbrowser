@@ -496,6 +496,7 @@
 
 - (id)initWithUserAgent:(NSString*)userAgent prevUserAgent:(NSString*)prevUserAgent browserOptions: (CDVInAppBrowserOptions*) browserOptions
 {
+    userAgent = [userAgent stringByAppendingString:@" Cordova"];
     self = [super init];
     if (self != nil) {
         _userAgent = userAgent;
