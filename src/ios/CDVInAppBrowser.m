@@ -289,11 +289,8 @@
 
 - (void)injectDeferredObject:(NSString*)source withWrapper:(NSString*)jsWrapper
 {
-    if (!_injectedIframeBridge) {
-        _injectedIframeBridge = YES;
-        // Create an iframe bridge in the new document to communicate with the CDVInAppBrowserViewController
-        [self.inAppBrowserViewController.webView stringByEvaluatingJavaScriptFromString:@"(function(d){if(!window._cdvIframeBridge){var e = _cdvIframeBridge = d.createElement('iframe');e.style.display='none';d.body.appendChild(e);}})(document)"];
-    }
+    // Create an iframe bridge in the new document to communicate with the CDVInAppBrowserViewController
+    [self.inAppBrowserViewController.webView stringByEvaluatingJavaScriptFromString:@"(function(d){if(!window._cdvIframeBridge){var e = _cdvIframeBridge = d.createElement('iframe');e.style.display='none';d.body.appendChild(e);}})(document)"];
 
     if (jsWrapper != nil) {
         NSString* sourceArrayString = [@[source] JSONString];
